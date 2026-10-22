@@ -1,0 +1,8 @@
+{
+  "name": "chuva-no-caminho",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verificar": "node verificar.mjs"
+  }
+}
