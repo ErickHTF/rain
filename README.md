@@ -1,4 +1,4 @@
-# Chuva no Caminho
+# Rain Cloak
 
 Aplicação web em português para consultar chuva ao longo de uma rota de carro e comparar saídas durante três horas: a cada 30 minutos se todos os horários analisados estiverem secos, ou a cada 15 minutos se houver chuva. Usa JavaScript nativo, CSS e Leaflet, sem backend ou etapa de build.
 
