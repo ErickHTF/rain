@@ -1,0 +1,50 @@
+[
+  {
+    "viewport": "desktop",
+    "theme": "light",
+    "width": 1440,
+    "height": 1670,
+    "verdictTop": 233.390625,
+    "verdictBottom": 458.375
+  },
+  {
+    "viewport": "desktop",
+    "theme": "dark",
+    "width": 1440,
+    "height": 1670,
+    "verdictTop": 233.390625,
+    "verdictBottom": 458.375
+  },
+  {
+    "viewport": "mobile",
+    "theme": "light",
+    "width": 390,
+    "height": 1746,
+    "verdictTop": 152,
+    "verdictBottom": 367
+  },
+  {
+    "viewport": "mobile",
+    "theme": "dark",
+    "width": 390,
+    "height": 1746,
+    "verdictTop": 152,
+    "verdictBottom": 367
+  },
+  {
+    "viewport": "small",
+    "theme": "light",
+    "width": 320,
+    "height": 1875,
+    "verdictTop": 152,
+    "verdictBottom": 396.59375
+  },
+  {
+    "viewport": "small",
+    "theme": "dark",
+    "width": 320,
+    "height": 1875,
+    "verdictTop": 152,
+    "verdictBottom": 396.59375
+  }
+]
