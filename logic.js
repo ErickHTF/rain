@@ -66,6 +66,19 @@ function toEpoch(localIso, offsetSec) {
 }
 
 export function indexForecast(raw) {
+  for (const [series, fields, minimum] of [
+    [raw.hourly, ["precipitation_probability", "weather_code"], 2],
+    [raw.minutely_15, ["precipitation"], 1],
+  ]) {
+    if (!Array.isArray(series?.time) || series.time.length < minimum ||
+        fields.some((field) => !Array.isArray(series[field]) || series[field].length !== series.time.length)) {
+      throw new Error("previsão incompleta");
+    }
+    const times = series.time.map((t) => toEpoch(t, raw.utc_offset_seconds ?? 0));
+    if (times.some((t, i) => !Number.isFinite(t) || (i > 0 && t <= times[i - 1]))) {
+      throw new Error("horários inválidos na previsão");
+    }
+  }
   const off = raw.utc_offset_seconds ?? 0;
   return {
     raw,
@@ -74,25 +87,36 @@ export function indexForecast(raw) {
   };
 }
 
+export function departureWindow(forecasts, duration, comparisonHours = 3) {
+  return {
+    min: Math.max(...forecasts.map((fc) => Math.max(fc.hourlyT[0], fc.m15T[0]))),
+    max: Math.min(...forecasts.map((fc) => Math.min(fc.hourlyT.at(-1), fc.m15T.at(-1) + 900000 - 1)))
+      - duration * 1000 - comparisonHours * 3600000,
+  };
+}
+
 export function readAt(fc, epoch) {
   const h = fc.raw.hourly;
   const ht = fc.hourlyT;
-  if (epoch < ht[0] || epoch > ht[ht.length - 1]) throw new Error("horário fora do período da previsão");
+  if (!Number.isFinite(epoch) || epoch < ht[0] || epoch > ht[ht.length - 1]) throw new Error("horário fora do período da previsão");
   let i = Math.min(ht.length - 2, Math.floor((epoch - ht[0]) / 3600000));
   while (i > 0 && ht[i] > epoch) i--;
   while (i < ht.length - 2 && ht[i + 1] <= epoch) i++;
   const f = (epoch - ht[i]) / (ht[i + 1] - ht[i]);
-  const p0 = h.precipitation_probability[i] ?? 0;
-  const p1 = h.precipitation_probability[i + 1] ?? p0;
+  const p0 = h.precipitation_probability[i];
+  const p1 = h.precipitation_probability[i + 1];
+  if (!Number.isFinite(p0) || !Number.isFinite(p1)) throw new Error("chance de chuva indisponível nesse horário");
   const prob = p0 + (p1 - p0) * f;
   const code = h.weather_code[f < 0.5 ? i : i + 1];
 
   const mt = fc.m15T;
+  if (epoch < mt[0] || epoch >= mt[mt.length - 1] + 900000) throw new Error("horário fora do período de precipitação");
   let k = Math.floor((epoch - mt[0]) / 900000);
   k = Math.max(0, Math.min(mt.length - 1, k));
   while (k > 0 && mt[k] > epoch) k--;
   while (k < mt.length - 1 && mt[k + 1] <= epoch) k++;
-  const mm = fc.raw.minutely_15.precipitation[k] ?? 0;
+  const mm = fc.raw.minutely_15.precipitation[k];
+  if (!Number.isFinite(mm)) throw new Error("precipitação indisponível nesse horário");
 
   return { prob, mm, code, hourIndex: i, hourFrac: f, slotIndex: k, slotTime: fc.raw.minutely_15.time[k] };
 }
@@ -203,5 +227,11 @@ export function simulateDepartures({ points, forecasts, distance, duration, now,
   const minProb = Math.min(...peaks.map((p) => p.prob));
   const minMm = Math.min(...peaks.map((p) => p.mm));
   const best = minRank === 0 ? candidates[0] : candidates.find((t, i) => peaks[i].prob <= minProb + 10 && peaks[i].mm <= minMm + 0.2);
-  return { trips, best };
+  return { trips, best: best ?? candidates.reduce((a, b) => a.score <= b.score ? a : b) };
+}
+
+// Inspect every 15-minute option before reducing the presentation: never hide a wet slot.
+export function comparisonDepartures(sim) {
+  const dry = sim.trips.every(trip => trip.worst === "seco");
+  return { ...sim, trips: dry ? sim.trips.filter((_, i) => i % 2 === 0) : sim.trips, stepMin: dry ? 30 : 15 };
 }

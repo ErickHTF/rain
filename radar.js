@@ -1,3 +1,5 @@
+import { fetchJson } from "./api.js";
+
 const API = "https://api.rainviewer.com/public/weather-maps.json";
 const Z = 7;
 const SIZE = 256;
@@ -24,8 +26,13 @@ function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("tile do radar não carregou"));
+    const timer = setTimeout(() => {
+      img.onload = img.onerror = null;
+      img.src = "";
+      reject(new Error("tempo esgotado ao carregar o radar"));
+    }, 12000);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => { clearTimeout(timer); reject(new Error("tile do radar não carregou")); };
     img.src = url;
   });
 }
@@ -73,6 +80,7 @@ export function estimateMotion(prev, cur, w, h, dtMin) {
 
 function maxAround(radar, grid, x, y, r) {
   const { w, h } = radar.box;
+  if (x - r < 0 || y - r < 0 || x + r >= w || y + r >= h) return null;
   let m = 0;
   let steady = false;
   const r2 = r * r;
@@ -107,8 +115,8 @@ function without(grid, mask) {
 }
 
 export async function loadRadar(coords) {
-  const res = await fetch(API).then((r) => r.json());
-  const past = res.radar?.past ?? [];
+  const res = await fetchJson(API);
+  const past = (res.radar?.past ?? []).slice(-13);
   if (!past.length) throw new Error("sem imagens de radar");
 
   const pts = coords.map(([lon, lat]) => toPx(lat, lon));
@@ -117,6 +125,7 @@ export async function loadRadar(coords) {
   const x1 = Math.ceil(Math.max(...pts.map((p) => p.x)) + PAD);
   const y1 = Math.ceil(Math.max(...pts.map((p) => p.y)) + PAD);
   const box = { x0, y0, w: x1 - x0, h: y1 - y0 };
+  if (box.w * box.h > 1000000) throw new Error("rota extensa demais para análise local do radar");
   const tiles = [];
   for (let ty = Math.floor(y0 / SIZE); ty <= Math.floor((y1 - 1) / SIZE); ty++) {
     for (let tx = Math.floor(x0 / SIZE); tx <= Math.floor((x1 - 1) / SIZE); tx++) tiles.push({ x: tx, y: ty });
